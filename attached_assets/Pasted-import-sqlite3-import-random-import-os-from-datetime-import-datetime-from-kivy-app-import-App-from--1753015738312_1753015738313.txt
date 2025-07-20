@@ -1,0 +1,1582 @@
+import sqlite3
+import random
+import os
+from datetime import datetime
+
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.uix.spinner import Spinner, SpinnerOption
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.scrollview import ScrollView
+from kivy.clock import Clock
+from kivy.metrics import dp
+from kivy.utils import get_color_from_hex
+from kivy.graphics import Color, Rectangle, RoundedRectangle, Line, Ellipse
+from kivy.uix.widget import Widget
+from kivy.uix.floatlayout import FloatLayout
+from kivy.animation import Animation
+from kivy.uix.popup import Popup
+
+# Modern Dark Theme with Accent Colors
+COLORS = {
+    # Main palette
+    'bg_primary': get_color_from_hex('#0F172A'),      # Dark slate
+    'bg_secondary': get_color_from_hex('#1E293B'),    # Medium slate
+    'bg_tertiary': get_color_from_hex('#334155'),     # Light slate
+    'surface': get_color_from_hex('#1E293B'),         # Card background
+    'surface_light': get_color_from_hex('#475569'),   # Lighter surface
+    
+    # Accent colors
+    'primary': get_color_from_hex('#3B82F6'),         # Blue
+    'primary_dark': get_color_from_hex('#1D4ED8'),    # Dark blue
+    'secondary': get_color_from_hex('#8B5CF6'),       # Purple
+    'accent': get_color_from_hex('#06B6D4'),          # Cyan
+    'success': get_color_from_hex('#10B981'),         # Green
+    'warning': get_color_from_hex('#F59E0B'),         # Amber
+    'error': get_color_from_hex('#EF4444'),           # Red
+    
+    # Text colors
+    'text_primary': get_color_from_hex('#F8FAFC'),    # Almost white
+    'text_secondary': get_color_from_hex('#CBD5E1'),  # Light gray
+    'text_muted': get_color_from_hex('#94A3B8'),      # Muted gray
+    'text_accent': get_color_from_hex('#3B82F6'),     # Blue text
+    
+    # Gradients and effects
+    'gradient_start': get_color_from_hex('#3B82F6'),
+    'gradient_end': get_color_from_hex('#8B5CF6'),
+    'shadow': (0, 0, 0, 0.25),
+    'border': get_color_from_hex('#475569'),
+}
+
+class ModernCard(BoxLayout):
+    """Clean modern card with subtle shadow"""
+    def __init__(self, elevation=2, **kwargs):
+        super().__init__(**kwargs)
+        self.elevation = elevation
+        
+        with self.canvas.before:
+            # Shadow
+            Color(0, 0, 0, 0.1 + (elevation * 0.05))
+            self.shadow = RoundedRectangle(radius=[12])
+            
+            # Card background
+            Color(*COLORS['surface'])
+            self.bg = RoundedRectangle(radius=[12])
+            
+            # Subtle border
+            Color(*COLORS['border'])
+            self.border = Line(width=1, rounded_rectangle=(0, 0, 0, 0, 12))
+        
+        self.bind(pos=self.update_graphics, size=self.update_graphics)
+    
+    def update_graphics(self, *args):
+        shadow_offset = self.elevation * 2
+        
+        # Shadow
+        self.shadow.pos = (self.x, self.y - shadow_offset)
+        self.shadow.size = self.size
+        
+        # Background
+        self.bg.pos = self.pos
+        self.bg.size = self.size
+        
+        # Border
+        self.border.rounded_rectangle = (self.x, self.y, self.width, self.height, 12)
+
+
+
+# Improved ModernButton class with better canvas management
+class ModernButton(Button):
+    """Clean modern button with hover effects and better canvas management"""
+    def __init__(self, button_type='primary', **kwargs):
+        super().__init__(**kwargs)
+        
+        self.button_type = button_type
+        self._graphics_bound = False
+        
+        # Button styles
+        styles = {
+            'primary': {
+                'bg_color': COLORS['primary'],
+                'text_color': COLORS['text_primary'],
+                'hover_color': COLORS['primary_dark']
+            },
+            'secondary': {
+                'bg_color': COLORS['surface_light'],
+                'text_color': COLORS['text_primary'],
+                'hover_color': COLORS['bg_tertiary']
+            },
+            'success': {
+                'bg_color': COLORS['success'],
+                'text_color': COLORS['text_primary'],
+                'hover_color': get_color_from_hex('#059669')
+            },
+            'warning': {
+                'bg_color': COLORS['warning'],
+                'text_color': COLORS['text_primary'],
+                'hover_color': get_color_from_hex('#D97706')
+            },
+            'error': {
+                'bg_color': COLORS['error'],
+                'text_color': COLORS['text_primary'],
+                'hover_color': get_color_from_hex('#DC2626')
+            },
+            'outline': {
+                'bg_color': (0, 0, 0, 0),
+                'text_color': COLORS['text_secondary'],
+                'hover_color': COLORS['surface_light']
+            }
+        }
+        
+        self.style_config = styles.get(button_type, styles['primary'])
+        
+        self.background_color = (0, 0, 0, 0)
+        self.color = self.style_config['text_color']
+        self.font_size = '16sp'
+        self.bold = True
+        
+        self.create_background()
+        self.bind_graphics_updates()
+    
+    def create_background(self):
+        """Create the button background graphics"""
+        self.canvas.before.clear()
+        
+        with self.canvas.before:
+            Color(*self.style_config['bg_color'])
+            self.bg_rect = RoundedRectangle(radius=[8])
+            
+            if self.button_type == 'outline':
+                Color(*COLORS['border'])
+                self.border_line = Line(width=2, rounded_rectangle=(0, 0, 0, 0, 8))
+    
+    def bind_graphics_updates(self):
+        """Bind graphics update events (avoid duplicate bindings)"""
+        if not self._graphics_bound:
+            self.bind(pos=self.update_graphics, size=self.update_graphics)
+            self._graphics_bound = True
+    
+    def update_graphics(self, *args):
+        """Update graphics positioning"""
+        if hasattr(self, 'bg_rect'):
+            self.bg_rect.pos = self.pos
+            self.bg_rect.size = self.size
+        
+        if hasattr(self, 'border_line'):
+            self.border_line.rounded_rectangle = (self.x, self.y, self.width, self.height, 8)
+    
+    def reset_to_default(self):
+        """Reset button to its default appearance"""
+        self.disabled = False
+        self.color = self.style_config['text_color']
+        self.create_background()
+        self.update_graphics()
+
+
+
+class ModernLabel(Label):
+    """Styled labels with consistent typography"""
+    def __init__(self, label_type='body', **kwargs):
+        super().__init__(**kwargs)
+        
+        styles = {
+            'h1': {'color': COLORS['text_primary'], 'font_size': '32sp', 'bold': True},
+            'h2': {'color': COLORS['text_primary'], 'font_size': '24sp', 'bold': True},
+            'h3': {'color': COLORS['text_primary'], 'font_size': '20sp', 'bold': True},
+            'body': {'color': COLORS['text_primary'], 'font_size': '16sp'},
+            'caption': {'color': COLORS['text_secondary'], 'font_size': '14sp'},
+            'muted': {'color': COLORS['text_muted'], 'font_size': '14sp'},
+            'accent': {'color': COLORS['text_accent'], 'font_size': '16sp', 'bold': True}
+        }
+        
+        style = styles.get(label_type, styles['body'])
+        self.color = style['color']
+        self.font_size = style['font_size']
+        if style.get('bold'):
+            self.bold = True
+
+
+
+class ModernTextInput(TextInput):
+    """Modern text input with clean styling"""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.background_color = (0, 0, 0, 0)
+        self.foreground_color = COLORS['text_primary']
+        self.cursor_color = COLORS['primary']
+        self.selection_color = (*COLORS['primary'][:3], 0.3)
+        self.font_size = '16sp'
+        self.padding = [12, 8]
+        
+        with self.canvas.before:
+            Color(*COLORS['bg_tertiary'])
+            self.bg_rect = RoundedRectangle(radius=[8])
+            
+            Color(*COLORS['border'])
+            # Create the Line instruction without assigning it to a property
+            self.border_line = Line(width=1, rounded_rectangle=(0, 0, 0, 0, 8))
+        
+        self.bind(pos=self.update_graphics, size=self.update_graphics)
+        self.bind(focus=self.on_focus)
+    
+    def update_graphics(self, *args):
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
+        self.border_line.rounded_rectangle = (self.x, self.y, self.width, self.height, 8)
+    
+    def on_focus(self, instance, focused):
+        # Clear and rebuild the border with the right color and width
+        self.canvas.before.clear()
+        
+        with self.canvas.before:
+            Color(*COLORS['bg_tertiary'])
+            self.bg_rect = RoundedRectangle(radius=[8])
+            
+            if focused:
+                Color(*COLORS['primary'])
+                self.border_line = Line(width=2, rounded_rectangle=(self.x, self.y, self.width, self.height, 8))
+            else:
+                Color(*COLORS['border'])
+                self.border_line = Line(width=1, rounded_rectangle=(self.x, self.y, self.width, self.height, 8))
+
+
+class ModernSpinnerOption(SpinnerOption):
+    """Custom spinner option with modern styling"""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.background_color = COLORS['surface']
+        self.color = COLORS['text_primary']
+        self.font_size = '14sp'
+
+class ModernSpinner(Spinner):
+    """Styled spinner dropdown"""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.background_color = COLORS['bg_tertiary']
+        self.color = COLORS['text_primary']
+        self.font_size = '16sp'
+        self.option_cls = ModernSpinnerOption
+
+class GradientBackground(Widget):
+    """Animated gradient background"""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        with self.canvas.before:
+            # Base background
+            Color(*COLORS['bg_primary'])
+            self.bg = Rectangle()
+            
+            # Gradient circles for dynamic effect
+            Color(*COLORS['gradient_start'], 0.1)  # Use comma instead of +
+            self.circle1 = Ellipse()
+            
+            Color(*COLORS['gradient_end'], 0.08)  # Use comma instead of +
+            self.circle2 = Ellipse()
+        
+        self.bind(pos=self.update_graphics, size=self.update_graphics)
+        Clock.schedule_once(self.start_animation, 1)
+    
+    def update_graphics(self, *args):
+        self.bg.pos = self.pos
+        self.bg.size = self.size
+        
+        # Position gradient circles
+        self.circle1.pos = (self.x - 100, self.y + self.height * 0.7)
+        self.circle1.size = (300, 300)
+        
+        self.circle2.pos = (self.x + self.width - 200, self.y - 100)
+        self.circle2.size = (400, 400)
+    
+    def start_animation(self, *args):
+        # Subtle floating animation for gradient circles
+        anim1 = Animation(pos=(self.circle1.pos[0] + 20, self.circle1.pos[1] + 30), 
+                         duration=8) + Animation(pos=self.circle1.pos, duration=8)
+        anim1.repeat = True
+        anim1.start(self.circle1)
+
+
+class DatabaseManager:
+    def __init__(self):
+        self.db_path = 'vocabulary.db'
+        self.init_database()
+    
+    def init_database(self):
+        """Initialize SQLite database with words table"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS words (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                word TEXT NOT NULL,
+                translation TEXT NOT NULL,
+                category TEXT NOT NULL,
+                dictionary TEXT NOT NULL,
+                language TEXT NOT NULL,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                review_count INTEGER DEFAULT 0,
+                correct_count INTEGER DEFAULT 0
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    
+    def add_word(self, word, translation, category, dictionary, language):
+        """Add a new word to the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO words (word, translation, category, dictionary, language)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (word.strip(), translation.strip(), category.strip(), dictionary.strip(), language.strip()))
+        conn.commit()
+        conn.close()
+    
+    def update_word_stats(self, word_id, correct=True):
+        """Update word statistics after quiz/practice"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        if correct:
+            cursor.execute('UPDATE words SET review_count = review_count + 1, correct_count = correct_count + 1 WHERE id = ?', (word_id,))
+        else:
+            cursor.execute('UPDATE words SET review_count = review_count + 1 WHERE id = ?', (word_id,))
+        conn.commit()
+        conn.close()
+    
+    def get_filtered_words(self, category=None, dictionary=None, language=None):
+        """Get words filtered by category, dictionary, and/or language"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        query = 'SELECT * FROM words WHERE 1=1'
+        params = []
+        
+        if category and category != 'All':
+            query += ' AND category = ?'
+            params.append(category)
+        
+        if dictionary and dictionary != 'All':
+            query += ' AND dictionary = ?'
+            params.append(dictionary)
+        
+        if language and language != 'All':
+            query += ' AND language = ?'
+            params.append(language)
+        
+        query += ' ORDER BY added_at DESC'
+        cursor.execute(query, params)
+        words = cursor.fetchall()
+        conn.close()
+        return words
+    
+    def get_categories(self):
+        """Get all unique categories"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT category FROM words ORDER BY category')
+        categories = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return ['All'] + categories
+    
+    def get_dictionaries(self):
+        """Get all unique dictionaries"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT dictionary FROM words ORDER BY dictionary')
+        dictionaries = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return ['All'] + dictionaries
+    
+    def get_languages(self):
+        """Get all unique languages"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT language FROM words ORDER BY language')
+        languages = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return ['All'] + languages
+
+    def delete_word(self, word_id):
+        """Delete a word from the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM words WHERE id = ?', (word_id,))
+        conn.commit()
+        conn.close()
+
+    def update_word(self, word_id, word, translation, category, dictionary, language):
+        """Update an existing word in the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE words 
+            SET word = ?, translation = ?, category = ?, dictionary = ?, language = ?
+            WHERE id = ?
+        ''', (word.strip(), translation.strip(), category.strip(), dictionary.strip(), language.strip(), word_id))
+        conn.commit()
+        conn.close()
+
+    def get_word_by_id(self, word_id):
+        """Get a single word by ID"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM words WHERE id = ?', (word_id,))
+        word = cursor.fetchone()
+        conn.close()
+        return word
+
+
+class MainMenuScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = 'main'
+        
+        # Gradient background
+        bg = GradientBackground()
+        self.add_widget(bg)
+        
+        # Main layout with consistent spacing
+        main_layout = BoxLayout(orientation='vertical', padding=dp(30), spacing=dp(20))
+        
+        # Header section - Fixed height
+        header = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(140), spacing=dp(8))
+        
+        # Top spacer for better centering
+        header.add_widget(Widget(size_hint_y=None, height=dp(10)))
+        
+        # Title
+        title = ModernLabel(text='German Vocabulary', label_type='h1', halign='center')
+        title.text_size = (None, None)
+        title.bind(size=self._update_title_text_size)
+        
+        # Subtitle
+        subtitle = ModernLabel(text='Master German words with interactive learning', 
+                             label_type='caption', halign='center')
+        subtitle.text_size = (None, None)
+        subtitle.bind(size=self._update_subtitle_text_size)
+        
+        header.add_widget(title)
+        header.add_widget(Widget(size_hint_y=None, height=dp(5)))  # Small spacer
+        header.add_widget(subtitle)
+        header.add_widget(Widget())  # Flexible spacer
+        
+        main_layout.add_widget(header)
+        
+        # Menu section - Takes remaining space but with limits
+        menu_section = BoxLayout(orientation='vertical', size_hint_y=0.6)
+        
+        # Add some top spacing
+        menu_section.add_widget(Widget(size_hint_y=0.1))
+        
+        # Menu card - Fixed aspect ratio
+        menu_card = ModernCard(orientation='vertical', size_hint_y=None, height=dp(320),
+                              padding=dp(25), spacing=dp(12), elevation=3)
+        
+        # Menu buttons
+        buttons_data = [
+            ('📝 Add New Word', 'add_word', 'primary'),
+            ('🃏 Flashcard Practice', 'flashcard', 'secondary'), 
+            ('🎯 Multiple Choice Quiz', 'quiz', 'secondary'),
+            ('📚 View Collection', 'word_list', 'outline')
+        ]
+        
+        for text, screen_name, btn_type in buttons_data:
+            btn = ModernButton(text=text, button_type=btn_type, 
+                             size_hint_y=None, height=dp(60))
+            btn.bind(on_press=lambda x, s=screen_name: self.switch_screen(s))
+            menu_card.add_widget(btn)
+        
+        # Center the menu card
+        menu_container = BoxLayout(orientation='horizontal')
+        menu_container.add_widget(Widget(size_hint_x=0.1))  # Left spacer
+        menu_container.add_widget(menu_card)
+        menu_container.add_widget(Widget(size_hint_x=0.1))  # Right spacer
+        
+        menu_section.add_widget(menu_container)
+        menu_section.add_widget(Widget(size_hint_y=0.1))  # Bottom spacer
+        
+        main_layout.add_widget(menu_section)
+        
+        # Bottom spacer - Fixed size
+        main_layout.add_widget(Widget(size_hint_y=None, height=dp(20)))
+        
+        self.add_widget(main_layout)
+        
+        # Store references for text size updates
+        self.title = title
+        self.subtitle = subtitle
+    
+    def _update_title_text_size(self, instance, size):
+        """Update title text wrapping"""
+        instance.text_size = (size[0], None)
+    
+    def _update_subtitle_text_size(self, instance, size):
+        """Update subtitle text wrapping"""
+        instance.text_size = (size[0], None)
+    
+    def switch_screen(self, screen_name):
+        self.manager.current = screen_name
+    
+    def on_size(self, *args):
+        """Handle window resize"""
+        Clock.schedule_once(self.update_text_wrapping, 0.1)
+    
+    def update_text_wrapping(self, *args):
+        """Update text wrapping for responsive design"""
+        if hasattr(self, 'title'):
+            self.title.text_size = (self.title.width, None)
+        if hasattr(self, 'subtitle'):
+            self.subtitle.text_size = (self.subtitle.width, None)
+
+
+
+
+class AddWordScreen(Screen):
+    def __init__(self, db_manager, **kwargs):
+        super().__init__(**kwargs)
+        self.name = 'add_word'
+        self.db_manager = db_manager
+        
+        # Gradient background
+        bg = GradientBackground()
+        self.add_widget(bg)
+        
+        # Main layout
+        layout = BoxLayout(orientation='vertical', padding=dp(30), spacing=dp(20))
+        
+        # Replace the current header BoxLayout with:
+        header = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(50), spacing=dp(10))
+
+        # Change the back button to be responsive:
+        back_btn = ModernButton(text='← Back', button_type='outline', 
+                            size_hint=(None, None), size=(dp(70), dp(40)))
+        back_btn.bind(on_press=lambda x: self.switch_screen('main'))
+
+        # Make the title responsive:
+        title = ModernLabel(text='Your Title Here', label_type='h2', size_hint_x=0.7)  # Allow it to shrink
+        title.text_size = (None, None)
+        title.bind(size=lambda instance, size: setattr(instance, 'text_size', (size[0], None)))
+
+        # For QuizScreen specifically, adjust the score label:
+        self.score_label = ModernLabel(text='Score: 0/0', label_type='accent', 
+                                    halign='right', size_hint_x=0.3)  # Reduced from 0.4 to 0.3
+        
+        header.add_widget(back_btn)
+        header.add_widget(Widget(size_hint_x=0.1))
+        header.add_widget(title)
+        header.add_widget(Widget())
+        
+        layout.add_widget(header)
+        
+        # Scrollable form section
+        scroll = ScrollView()
+        scroll_content = BoxLayout(orientation='vertical', spacing=dp(20), 
+                                 size_hint_y=None, padding=[0, dp(10), 0, dp(10)])
+        scroll_content.bind(minimum_height=scroll_content.setter('height'))
+        
+        # Form in a card
+        form_card = ModernCard(orientation='vertical', size_hint_y=None, 
+                              padding=dp(25), spacing=dp(15), elevation=2)
+        
+        # Calculate form height dynamically
+        form_height = dp(450)  # Base height for 5 fields + padding
+        form_card.height = form_height
+        
+        # Create form fields with more compact design
+        def create_form_field(label_text, hint=''):
+            field_box = BoxLayout(orientation='vertical', spacing=dp(5), 
+                                size_hint_y=None, height=dp(70))
+            
+            label = ModernLabel(text=label_text, label_type='accent', 
+                               size_hint_y=None, height=dp(18),
+                               text_size=(None, None))
+            text_input = ModernTextInput(hint_text=hint, size_hint_y=None, height=dp(45))
+            
+            field_box.add_widget(label)
+            field_box.add_widget(text_input)
+            return field_box, text_input
+        
+        # Form fields
+        word_box, self.word_input = create_form_field('German Word', 'e.g., das Haus')
+        trans_box, self.translation_input = create_form_field('Translation', 'e.g., the house')
+        cat_box, self.category_input = create_form_field('Category', 'e.g., Nouns')
+        dict_box, self.dictionary_input = create_form_field('Dictionary/Source', 'e.g., A1 Vocabulary')
+        lang_box, self.language_input = create_form_field('Translation Language', 'e.g., English')
+        
+        for box in [word_box, trans_box, cat_box, dict_box, lang_box]:
+            form_card.add_widget(box)
+        
+        # Add form card to scroll content
+        scroll_content.add_widget(form_card)
+        
+        # Status message in scroll area
+        self.status_label = ModernLabel(text='', label_type='caption', 
+                                      size_hint_y=None, height=dp(25))
+        scroll_content.add_widget(self.status_label)
+        
+        # Add some bottom padding to scroll content
+        scroll_content.add_widget(Widget(size_hint_y=None, height=dp(20)))
+        
+        scroll.add_widget(scroll_content)
+        layout.add_widget(scroll)
+        
+        # Bottom button section - Fixed at bottom
+        bottom_section = BoxLayout(orientation='vertical', size_hint_y=None, 
+                                 height=dp(60), spacing=dp(10))
+        
+        save_btn = ModernButton(text='💾 Save Word', button_type='success', 
+                               size_hint_y=None, height=dp(45))
+        save_btn.bind(on_press=self.save_word)
+        bottom_section.add_widget(save_btn)
+        
+        layout.add_widget(bottom_section)
+        
+        self.add_widget(layout)
+    
+    def save_word(self, instance):
+        fields = [
+            self.word_input.text.strip(),
+            self.translation_input.text.strip(),
+            self.category_input.text.strip(),
+            self.dictionary_input.text.strip(),
+            self.language_input.text.strip()
+        ]
+        
+        if not all(fields):
+            self.status_label.text = '❌ Please fill all fields'
+            self.status_label.color = COLORS['error']
+            return
+        
+        try:
+            self.db_manager.add_word(*fields)
+            
+            # Clear fields
+            for field in [self.word_input, self.translation_input, self.category_input, 
+                         self.dictionary_input, self.language_input]:
+                field.text = ''
+            
+            self.status_label.text = '✅ Word saved successfully!'
+            self.status_label.color = COLORS['success']
+            Clock.schedule_once(lambda dt: setattr(self.status_label, 'text', ''), 3)
+            
+        except Exception as e:
+            self.status_label.text = f'❌ Error saving word: {str(e)}'
+            self.status_label.color = COLORS['error']
+    
+    def switch_screen(self, screen_name):
+        self.manager.current = screen_name
+
+    
+    def on_size(self, *args):
+        # This will trigger text wrapping updates when window resizes
+        Clock.schedule_once(self.update_text_wrapping, 0.1)
+
+    def update_text_wrapping(self, *args):
+        # Force update of text_size for wrapped labels
+        pass  # The bind callbacks will handle the actual updates
+
+
+
+
+class FlashcardScreen(Screen):
+    def __init__(self, db_manager, **kwargs):
+        super().__init__(**kwargs)
+        self.name = 'flashcard'
+        self.db_manager = db_manager
+        self.current_words = []
+        self.current_word = None
+        self.showing_front = True
+        self.direction = 'German → Translation'
+        
+        # Gradient background
+        bg = GradientBackground()
+        self.add_widget(bg)
+        
+        # Main layout
+        layout = BoxLayout(orientation='vertical', padding=dp(30), spacing=dp(20))
+        
+        # Header
+        # Replace the current header BoxLayout with:
+        header = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(50), spacing=dp(10))
+
+        # Change the back button to be responsive:
+        back_btn = ModernButton(text='← Back', button_type='outline', 
+                            size_hint=(None, None), size=(dp(70), dp(40)))
+        back_btn.bind(on_press=lambda x: self.switch_screen('main'))
+
+        # Make the title responsive:
+        title = ModernLabel(text='Your Title Here', label_type='h2', size_hint_x=0.7)  # Allow it to shrink
+        title.text_size = (None, None)
+        title.bind(size=lambda instance, size: setattr(instance, 'text_size', (size[0], None)))
+
+        # For QuizScreen specifically, adjust the score label:
+        self.score_label = ModernLabel(text='Score: 0/0', label_type='accent', 
+                                    halign='right', size_hint_x=0.3)  # Reduced from 0.4 to 0.3
+        
+        header.add_widget(back_btn)
+        header.add_widget(Widget(size_hint_x=0.1))
+        header.add_widget(title)
+        header.add_widget(Widget())
+        
+        layout.add_widget(header)
+        
+        # Controls card
+        controls_card = ModernCard(orientation='vertical', size_hint_y=0.2,
+                                  padding=dp(20), spacing=dp(15), elevation=1)
+        
+        # Direction selector
+        direction_box = BoxLayout(orientation='horizontal', spacing=dp(10))
+        direction_label = ModernLabel(text='Direction:', label_type='caption', size_hint_x=0.2)
+        self.direction_spinner = ModernSpinner(
+            text='German → Translation',
+            values=['German → Translation', 'Translation → German'],
+            size_hint_x=0.8
+        )
+        self.direction_spinner.bind(text=self.on_direction_change)
+        direction_box.add_widget(direction_label)
+        direction_box.add_widget(self.direction_spinner)
+        
+        # Filters
+        filter_box = BoxLayout(orientation='horizontal', spacing=dp(10))
+        
+        # Create filter spinners
+        self.category_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=1)
+        self.dictionary_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=1)
+        self.language_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=1)
+        
+        for spinner in [self.category_spinner, self.dictionary_spinner, self.language_spinner]:
+            spinner.bind(text=self.on_filter_change)
+        
+        filter_box.add_widget(self.category_spinner)
+        filter_box.add_widget(self.dictionary_spinner)
+        filter_box.add_widget(self.language_spinner)
+        
+        controls_card.add_widget(direction_box)
+        controls_card.add_widget(filter_box)
+        layout.add_widget(controls_card)
+        
+        # Flashcard
+        self.card_container = ModernCard(size_hint_y=0.5, elevation=4)
+        
+        self.card_button = Button(
+            text='Tap to start practice',
+            font_size='20sp',
+            background_color=(0, 0, 0, 0),
+            color=COLORS['text_primary'],
+            bold=True
+        )
+        self.card_button.bind(on_press=self.flip_card)
+        self.card_container.add_widget(self.card_button)
+        
+        layout.add_widget(self.card_container)
+        
+        # Next button
+        next_btn = ModernButton(text='Next Word →', button_type='primary', 
+                               size_hint_y=0.12)
+        next_btn.bind(on_press=self.next_word)
+        layout.add_widget(next_btn)
+        
+        # Bottom spacer
+        layout.add_widget(Widget(size_hint_y=0.1))
+        
+        self.add_widget(layout)
+    
+    def on_size(self, *args):
+        # This will trigger text wrapping updates when window resizes
+        Clock.schedule_once(self.update_text_wrapping, 0.1)
+
+    def update_text_wrapping(self, *args):
+        # Force update of text_size for wrapped labels
+        pass  # The bind callbacks will handle the actual updates
+    
+    def on_enter(self):
+        self.update_spinners()
+        self.load_words()
+    
+    def update_spinners(self):
+        self.category_spinner.values = self.db_manager.get_categories()
+        self.dictionary_spinner.values = self.db_manager.get_dictionaries()
+        self.language_spinner.values = self.db_manager.get_languages()
+    
+    def on_direction_change(self, spinner, text):
+        self.direction = text
+        self.next_word(None)
+    
+    def on_filter_change(self, spinner, text):
+        self.load_words()
+    
+    def load_words(self):
+        category = getattr(self.category_spinner, 'text', 'All')
+        dictionary = getattr(self.dictionary_spinner, 'text', 'All')
+        language = getattr(self.language_spinner, 'text', 'All')
+        
+        self.current_words = self.db_manager.get_filtered_words(category, dictionary, language)
+        
+        if not self.current_words:
+            self.card_button.text = 'No words found!\n\nAdd some words first.'
+            self.current_word = None
+        else:
+            self.next_word(None)
+    
+    def next_word(self, instance):
+        if not self.current_words:
+            return
+        
+        self.current_word = random.choice(self.current_words)
+        self.showing_front = True
+        self.show_current_side()
+    
+    def show_current_side(self):
+        if not self.current_word:
+            return
+        
+        german_word, translation = self.current_word[1], self.current_word[2]
+        
+        if self.direction == 'German → Translation':
+            text = german_word if self.showing_front else translation
+            hint = 'Tap to reveal translation' if self.showing_front else 'Tap for next word'
+        else:
+            text = translation if self.showing_front else german_word
+            hint = 'Tap to reveal German' if self.showing_front else 'Tap for next word'
+        
+        self.card_button.text = f'{text}\n\n{hint}'
+    
+    def flip_card(self, instance):
+        if not self.current_word:
+            self.load_words()
+            return
+        
+        self.showing_front = not self.showing_front
+        self.show_current_side()
+    
+    def switch_screen(self, screen_name):
+        self.manager.current = screen_name
+
+
+
+
+
+class QuizScreen(Screen):
+    def __init__(self, db_manager, **kwargs):
+        super().__init__(**kwargs)
+        self.name = 'quiz'
+        self.db_manager = db_manager
+        self.current_words = []
+        self.current_word = None
+        self.correct_answer = ''
+        self.direction = 'German → Translation'
+        self.score = 0
+        self.questions_answered = 0
+        self.question_completed = False  # Track if current question is completed
+        self.feedback_timer = None  # Timer for hiding feedback
+        
+        # Gradient background
+        bg = GradientBackground()
+        self.add_widget(bg)
+        
+        # Main scrollable layout with reduced spacing
+        scroll = ScrollView()
+        main_layout = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(8),
+                               size_hint_y=None)
+        main_layout.bind(minimum_height=main_layout.setter('height'))
+        
+        # Header
+        header = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(50), spacing=dp(10))
+
+        back_btn = ModernButton(text='← Back', button_type='outline', 
+                            size_hint=(None, None), size=(dp(70), dp(40)))
+        back_btn.bind(on_press=lambda x: self.switch_screen('main'))
+
+        title = ModernLabel(text='Multiple Choice Quiz', label_type='h2', size_hint_x=0.7)
+        title.text_size = (None, None)
+        title.bind(size=lambda instance, size: setattr(instance, 'text_size', (size[0], None)))
+
+        self.score_label = ModernLabel(text='Score: 0/0', label_type='accent', 
+                                    halign='right', size_hint_x=0.3)
+        
+        header.add_widget(back_btn)
+        header.add_widget(title)
+        header.add_widget(self.score_label)
+        
+        main_layout.add_widget(header)
+        
+        # Controls card with reduced height and spacing
+        controls_card = ModernCard(orientation='vertical', size_hint_y=None, height=dp(100),
+                                  padding=dp(15), spacing=dp(8), elevation=1)
+        
+        # Direction selector
+        direction_box = BoxLayout(orientation='horizontal', spacing=dp(10), 
+                                 size_hint_y=None, height=dp(35))
+        direction_label = ModernLabel(text='Direction:', label_type='caption', 
+                                     size_hint_x=None, width=dp(80))
+        self.direction_spinner = ModernSpinner(
+            text='German → Translation',
+            values=['German → Translation', 'Translation → German'],
+            size_hint_x=1
+        )
+        self.direction_spinner.bind(text=self.on_direction_change)
+        direction_box.add_widget(direction_label)
+        direction_box.add_widget(self.direction_spinner)
+        
+        # Filters
+        filter_box = BoxLayout(orientation='horizontal', spacing=dp(8), 
+                              size_hint_y=None, height=dp(35))
+        
+        # Create filter spinners
+        self.category_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=1)
+        self.dictionary_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=1)
+        self.language_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=1)
+        
+        for spinner in [self.category_spinner, self.dictionary_spinner, self.language_spinner]:
+            spinner.bind(text=self.on_filter_change)
+        
+        filter_box.add_widget(self.category_spinner)
+        filter_box.add_widget(self.dictionary_spinner)
+        filter_box.add_widget(self.language_spinner)
+        
+        controls_card.add_widget(direction_box)
+        controls_card.add_widget(filter_box)
+        
+        main_layout.add_widget(controls_card)
+        
+        # Question card with reduced height
+        question_card = ModernCard(orientation='vertical', size_hint_y=None, height=dp(90),
+                                  padding=dp(15), elevation=3)
+        
+        self.question_label = ModernLabel(
+            text='Select options and start quiz',
+            label_type='h3',
+            halign='center',
+            text_size=(None, None)
+        )
+        self.question_label.bind(texture_size=self.question_label.setter('size'))
+        
+        question_card.add_widget(self.question_label)
+        main_layout.add_widget(question_card)
+        
+        # Feedback - MOVED ABOVE OPTIONS AND INITIALLY HIDDEN
+        self.feedback_label = ModernLabel(text='', label_type='body', 
+                                        size_hint_y=None, height=dp(0),  # Start with 0 height
+                                        halign='center', bold=True,
+                                        text_size=(None, None))
+        self.feedback_label.opacity = 0  # Start invisible
+        main_layout.add_widget(self.feedback_label)
+        
+        # Answer options container with reduced spacing and height
+        options_container = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(220), spacing=dp(6))
+        
+        self.option_buttons = []
+        for i in range(4):
+            # Wrap each button in a container for better control
+            btn_container = BoxLayout(size_hint_y=None, height=dp(50))
+            
+            btn = ModernButton(text='', button_type='secondary', 
+                             size_hint_y=None, height=dp(45))
+            btn.bind(on_press=lambda x, idx=i: self.select_answer(idx))
+            
+            self.option_buttons.append(btn)
+            btn_container.add_widget(btn)
+            options_container.add_widget(btn_container)
+        
+        main_layout.add_widget(options_container)
+        
+        # Next question button with reduced height
+        next_btn_container = BoxLayout(size_hint_y=None, height=dp(50))
+        next_btn = ModernButton(text='Next Question →', button_type='primary', 
+                               size_hint_y=None, height=dp(45))
+        next_btn.bind(on_press=self.next_question)
+        next_btn_container.add_widget(next_btn)
+        main_layout.add_widget(next_btn_container)
+        
+        # Reduced bottom padding
+        main_layout.add_widget(Widget(size_hint_y=None, height=dp(15)))
+        
+        scroll.add_widget(main_layout)
+        self.add_widget(scroll)
+    
+    def on_enter(self):
+        self.update_spinners()
+        self.load_words()
+        self.score = 0
+        self.questions_answered = 0
+        self.update_score_display()
+    
+    def update_spinners(self):
+        self.category_spinner.values = self.db_manager.get_categories()
+        self.dictionary_spinner.values = self.db_manager.get_dictionaries()
+        self.language_spinner.values = self.db_manager.get_languages()
+    
+    def on_direction_change(self, spinner, text):
+        self.direction = text
+        self.next_question(None)
+    
+    def on_filter_change(self, spinner, text):
+        self.load_words()
+    
+    def load_words(self):
+        category = getattr(self.category_spinner, 'text', 'All')
+        dictionary = getattr(self.dictionary_spinner, 'text', 'All')
+        language = getattr(self.language_spinner, 'text', 'All')
+        
+        self.current_words = self.db_manager.get_filtered_words(category, dictionary, language)
+        
+        if len(self.current_words) < 4:
+            self.question_label.text = 'Need at least 4 words for quiz mode\n\nAdd more words first!'
+            for btn in self.option_buttons:
+                btn.text = 'No options available'
+                btn.disabled = True
+            return
+        
+        self.next_question(None)
+
+    def hide_feedback(self, *args):
+        """Hide the feedback label"""
+        self.feedback_label.text = ''
+        self.feedback_label.height = dp(0)
+        self.feedback_label.opacity = 0
+
+    def show_feedback(self, message, color, duration=2.0):
+        """Show the feedback label with animation and auto-hide"""
+        # Cancel any existing timer
+        if self.feedback_timer:
+            self.feedback_timer.cancel()
+        
+        self.feedback_label.text = message
+        self.feedback_label.color = color
+        self.feedback_label.height = dp(60)
+        self.feedback_label.opacity = 1
+        self.feedback_label.text_size = (self.feedback_label.width, None)
+        
+        # Schedule hiding the feedback after specified duration
+        self.feedback_timer = Clock.schedule_once(self.hide_feedback, duration)
+
+    def next_question(self, instance):
+        if not self.current_words or len(self.current_words) < 4:
+            return
+        
+        # Cancel any existing feedback timer
+        if self.feedback_timer:
+            self.feedback_timer.cancel()
+        
+        # Hide feedback for new question
+        self.hide_feedback()
+        
+        # Reset question state
+        self.question_completed = False
+        
+        # Reset button styling
+        for btn in self.option_buttons:
+            btn.disabled = False
+            btn.reset_to_default()
+        
+        # Select random word and create options
+        self.current_word = random.choice(self.current_words)
+        german_word, translation = self.current_word[1], self.current_word[2]
+        
+        if self.direction == 'German → Translation':
+            question = german_word
+            self.correct_answer = translation
+            # Get wrong answers from other translations
+            wrong_answers = [w[2] for w in self.current_words if w[2] != translation]
+        else:
+            question = translation
+            self.correct_answer = german_word
+            # Get wrong answers from other German words
+            wrong_answers = [w[1] for w in self.current_words if w[1] != german_word]
+        
+        self.question_label.text = f'What does "{question}" mean?'
+        
+        # Create 4 options (1 correct, 3 wrong)
+        if len(wrong_answers) >= 3:
+            options = [self.correct_answer] + random.sample(wrong_answers, 3)
+            random.shuffle(options)
+            
+            # Update buttons with text wrapping
+            for i, btn in enumerate(self.option_buttons):
+                btn.text = options[i]
+                btn.disabled = False
+                # Enable text wrapping for long options
+                btn.text_size = (btn.width - dp(20), None)
+                btn.bind(size=self._update_button_text_size)
+
+    def _update_button_text_size(self, btn, *args):
+        """Update button text size when button size changes"""
+        btn.text_size = (btn.width - dp(20), None)
+
+    def reset_buttons_for_retry(self, *args):
+        """Reset buttons after wrong answer for retry"""
+        if not self.question_completed:
+            for btn in self.option_buttons:
+                btn.disabled = False
+                btn.reset_to_default()
+
+    def select_answer(self, option_index):
+        # Ignore clicks if question is already completed
+        if self.question_completed:
+            return
+            
+        selected_answer = self.option_buttons[option_index].text
+        is_correct = selected_answer == self.correct_answer
+        
+        if is_correct:
+            # Question completed successfully
+            self.question_completed = True
+            self.questions_answered += 1
+            self.score += 1
+            
+            self.show_feedback('✅ Correct! Great job!', COLORS['success'], duration=2.0)
+            self.db_manager.update_word_stats(self.current_word[0], correct=True)
+            
+            # Visual feedback - highlight correct answer
+            for i, btn in enumerate(self.option_buttons):
+                btn.disabled = True
+                if btn.text == self.correct_answer:
+                    self._highlight_button(btn, COLORS['success'], COLORS['text_primary'])
+                else:
+                    self._highlight_button(btn, COLORS['surface_light'], COLORS['text_muted'])
+            
+            self.update_score_display()
+            
+        else:
+            # Wrong answer - allow retry
+            self.show_feedback(f'❌ Try again! Think carefully...', COLORS['error'], duration=1.5)
+            
+            # Briefly highlight the wrong selection
+            self._highlight_button(self.option_buttons[option_index], COLORS['error'], COLORS['text_primary'])
+            
+            # Reset buttons after a short delay for retry
+            Clock.schedule_once(self.reset_buttons_for_retry, 1.5)
+
+    def _highlight_button(self, btn, bg_color, text_color):
+        """Helper method to highlight a button with specific colors"""
+        btn.canvas.before.clear()
+        
+        with btn.canvas.before:
+            Color(*bg_color)
+            btn.bg_rect = RoundedRectangle(radius=[8])
+        
+        btn.color = text_color
+        btn.update_graphics()
+    
+    def update_score_display(self):
+        if self.questions_answered > 0:
+            percentage = int((self.score / self.questions_answered) * 100)
+            self.score_label.text = f'Score: {self.score}/{self.questions_answered} ({percentage}%)'
+        else:
+            self.score_label.text = 'Score: 0/0'
+    
+    def switch_screen(self, screen_name):
+        # Cancel any timers when leaving the screen
+        if self.feedback_timer:
+            self.feedback_timer.cancel()
+        self.manager.current = screen_name
+    
+    def on_size(self, *args):
+        Clock.schedule_once(self.update_text_wrapping, 0.1)
+
+    def update_text_wrapping(self, *args):
+        pass
+
+
+
+class WordListScreen(Screen):
+    def __init__(self, db_manager, **kwargs):
+        super().__init__(**kwargs)
+        self.name = 'word_list'
+        self.db_manager = db_manager
+        
+        # Gradient background
+        bg = GradientBackground()
+        self.add_widget(bg)
+        
+        # Main layout
+        layout = BoxLayout(orientation='vertical', padding=dp(30), spacing=dp(20))
+        
+        # Header
+        # Replace the current header BoxLayout with:
+        header = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(50), spacing=dp(10))
+
+        # Change the back button to be responsive:
+        back_btn = ModernButton(text='← Back', button_type='outline', 
+                            size_hint=(None, None), size=(dp(70), dp(40)))
+        back_btn.bind(on_press=lambda x: self.switch_screen('main'))
+
+        # Make the title responsive:
+        title = ModernLabel(text='Your Title Here', label_type='h2', size_hint_x=0.7)  # Allow it to shrink
+        title.text_size = (None, None)
+        title.bind(size=lambda instance, size: setattr(instance, 'text_size', (size[0], None)))
+
+        # For QuizScreen specifically, adjust the score label:
+        self.score_label = ModernLabel(text='Score: 0/0', label_type='accent', 
+                                    halign='right', size_hint_x=0.3)  # Reduced from 0.4 to 0.3
+        
+        header.add_widget(back_btn)
+        header.add_widget(Widget(size_hint_x=0.1))
+        header.add_widget(title)
+        header.add_widget(Widget())
+        
+        layout.add_widget(header)
+        
+        # Filters card
+        filters_card = ModernCard(orientation='horizontal', size_hint_y=0.08,
+                                 padding=dp(15), spacing=dp(10), elevation=1)
+        
+        # Make the filter label smaller and spinners more flexible:
+        filter_label = ModernLabel(text='Filter:', label_type='caption', size_hint_x=None, width=dp(50))  # Reduced from 'Filter by:' and width from 0.15
+
+        # Adjust spinner proportions:
+        self.category_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=0.31)  # Slightly increased
+        self.dictionary_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=0.31)
+        self.language_spinner = ModernSpinner(text='All', values=['All'], size_hint_x=0.31)
+        
+        for spinner in [self.category_spinner, self.dictionary_spinner, self.language_spinner]:
+            spinner.bind(text=self.on_filter_change)
+        
+        filters_card.add_widget(filter_label)
+        filters_card.add_widget(self.category_spinner)
+        filters_card.add_widget(self.dictionary_spinner)
+        filters_card.add_widget(self.language_spinner)
+        
+        layout.add_widget(filters_card)
+
+        # Word list
+        scroll = ScrollView(size_hint_y=0.84)
+        self.word_grid = GridLayout(cols=1, spacing=dp(10), size_hint_y=None)
+        self.word_grid.bind(minimum_height=self.word_grid.setter('height'))
+        scroll.add_widget(self.word_grid)
+        layout.add_widget(scroll)
+        
+        self.add_widget(layout)
+
+    def on_size(self, *args):
+        # This will trigger text wrapping updates when window resizes
+        Clock.schedule_once(self.update_text_wrapping, 0.1)
+
+    def update_text_wrapping(self, *args):
+        # Force update of text_size for wrapped labels
+        pass  # The bind callbacks will handle the actual updates
+    
+    def on_enter(self):
+        self.update_spinners()
+        self.load_word_list()
+    
+    def update_spinners(self):
+        self.category_spinner.values = self.db_manager.get_categories()
+        self.dictionary_spinner.values = self.db_manager.get_dictionaries()
+        self.language_spinner.values = self.db_manager.get_languages()
+    
+    def on_filter_change(self, spinner, text):
+        self.load_word_list()
+        
+    def load_word_list(self):
+        self.word_grid.clear_widgets()
+        
+        category = getattr(self.category_spinner, 'text', 'All')
+        dictionary = getattr(self.dictionary_spinner, 'text', 'All')
+        language = getattr(self.language_spinner, 'text', 'All')
+        
+        words = self.db_manager.get_filtered_words(category, dictionary, language)
+        
+        if not words:
+            # No words card
+            no_words_card = ModernCard(padding=dp(30), size_hint_y=None, height=dp(100))
+            no_words_label = ModernLabel(
+                text='📝 No words found!\n\nAdd some words first to see them here.',
+                label_type='muted',
+                halign='center'
+            )
+            no_words_card.add_widget(no_words_label)
+            self.word_grid.add_widget(no_words_card)
+            return
+        
+        for word_data in words:
+            word_id, word, translation, category, dictionary, language, added_at, review_count, correct_count = word_data
+                    
+            # Create word card with buttons - NOW PROPERLY INDENTED INSIDE THE LOOP
+            word_card = ModernCard(orientation='vertical', size_hint_y=None, height=dp(140), 
+                                padding=dp(20), spacing=dp(8), elevation=2)
+
+            # Main content
+            content_box = BoxLayout(orientation='horizontal', spacing=dp(15))
+
+            # Left side - words (reduced width to make room for buttons)
+            words_box = BoxLayout(orientation='vertical', size_hint_x=0.4, spacing=dp(5))
+
+            word_label = ModernLabel(text=word, label_type='h3', halign='left')
+            word_label.text_size = (None, None)
+            word_label.bind(texture_size=word_label.setter('size'))
+
+            trans_label = ModernLabel(text=f'→ {translation}', label_type='body', halign='left')
+            trans_label.color = COLORS['text_secondary']
+            trans_label.text_size = (None, None)
+            trans_label.bind(texture_size=trans_label.setter('size'))
+
+            words_box.add_widget(word_label)
+            words_box.add_widget(trans_label)
+
+            # Middle - metadata
+            meta_box = BoxLayout(orientation='vertical', size_hint_x=0.4, spacing=dp(2))
+
+            category_label = ModernLabel(text=f'📁 {category}', label_type='caption', halign='center')
+            category_label.color = COLORS['primary']
+
+            dict_label = ModernLabel(text=f'📖 {dictionary}', label_type='caption', halign='center')
+            lang_label = ModernLabel(text=f'🌐 {language}', label_type='caption', halign='center')
+
+            # Stats
+            if review_count > 0:
+                accuracy = int((correct_count / review_count) * 100)
+                stats_text = f'📊 {correct_count}/{review_count} ({accuracy}%)'
+                stats_color = COLORS['success'] if accuracy >= 70 else COLORS['warning'] if accuracy >= 50 else COLORS['error']
+            else:
+                stats_text = '📊 Not practiced'
+                stats_color = COLORS['text_muted']
+
+            stats_label = ModernLabel(text=stats_text, label_type='caption', halign='center')
+            stats_label.color = stats_color
+
+            meta_box.add_widget(category_label)
+            meta_box.add_widget(dict_label)
+            meta_box.add_widget(lang_label)
+            meta_box.add_widget(stats_label)
+
+            # Right side - action buttons
+            buttons_box = BoxLayout(orientation='vertical', size_hint_x=0.2, spacing=dp(5))
+
+            edit_btn = ModernButton(text='✏️', button_type='outline', size_hint_y=None, height=dp(35))
+            edit_btn.bind(on_press=lambda x, data=word_data: self.show_edit_popup(data))
+
+            delete_btn = ModernButton(text='🗑️', button_type='error', size_hint_y=None, height=dp(35))
+            delete_btn.bind(on_press=lambda x, data=word_data: self.show_delete_confirmation(data))
+
+            buttons_box.add_widget(edit_btn)
+            buttons_box.add_widget(delete_btn)
+
+            content_box.add_widget(words_box)
+            content_box.add_widget(meta_box)
+            content_box.add_widget(buttons_box)
+
+            word_card.add_widget(content_box)
+            self.word_grid.add_widget(word_card)  # This was also outside the loop!
+    
+    def switch_screen(self, screen_name):
+        self.manager.current = screen_name
+
+
+
+
+
+    def show_edit_popup(self, word_data):
+        """Show popup for editing a word - fixed version with no background movement"""
+        from kivy.uix.popup import Popup
+        from kivy.core.window import Window
+        
+        word_id, word, translation, category, dictionary, language = word_data[:6]
+        
+        # Create popup content
+        popup_content = BoxLayout(orientation='vertical', spacing=dp(15), 
+                                padding=dp(25), size_hint_y=None, height=dp(450))
+        
+        # Title
+        title_label = ModernLabel(text='Edit Word', label_type='h3', 
+                                size_hint_y=None, height=dp(35), halign='center')
+        popup_content.add_widget(title_label)
+        
+        # Input fields
+        word_input = ModernTextInput(text=word, hint_text='German Word', 
+                                    size_hint_y=None, height=dp(45), multiline=False)
+        trans_input = ModernTextInput(text=translation, hint_text='Translation', 
+                                    size_hint_y=None, height=dp(45), multiline=False)
+        cat_input = ModernTextInput(text=category, hint_text='Category', 
+                                size_hint_y=None, height=dp(45), multiline=False)
+        dict_input = ModernTextInput(text=dictionary, hint_text='Dictionary', 
+                                    size_hint_y=None, height=dp(45), multiline=False)
+        lang_input = ModernTextInput(text=language, hint_text='Language', 
+                                    size_hint_y=None, height=dp(45), multiline=False)
+        
+        for input_field in [word_input, trans_input, cat_input, dict_input, lang_input]:
+            popup_content.add_widget(input_field)
+        
+        # Status message
+        status_label = ModernLabel(text='', label_type='caption', 
+                                size_hint_y=None, height=dp(30), halign='center')
+        popup_content.add_widget(status_label)
+        
+        # Buttons
+        button_layout = BoxLayout(orientation='horizontal', size_hint_y=None, 
+                                height=dp(50), spacing=dp(15))
+        
+        cancel_btn = ModernButton(text='Cancel', button_type='secondary', size_hint_x=0.4)
+        save_btn = ModernButton(text='Save Changes', button_type='success', size_hint_x=0.6)
+        
+        button_layout.add_widget(cancel_btn)
+        button_layout.add_widget(save_btn)
+        popup_content.add_widget(button_layout)
+        
+        # Create popup with fixed position - THIS IS THE KEY FIX
+        popup = Popup(
+            title='',
+            content=popup_content, 
+            size_hint=(None, None),
+            size=(dp(320), dp(500)),
+            pos_hint={'center_x': 0.5, 'center_y': 0.5},
+            auto_dismiss=False,
+            separator_height=0
+        )
+        
+        # SOLUTION 1: Override the on_touch_down to prevent position changes
+        original_on_touch_down = popup.on_touch_down
+        def fixed_on_touch_down(touch):
+            # Store original position
+            original_pos = popup.pos
+            result = original_on_touch_down(touch)
+            # Restore position after touch
+            popup.pos = original_pos
+            return result
+        popup.on_touch_down = fixed_on_touch_down
+        
+        # SOLUTION 2: Bind to window keyboard events to maintain position
+        def maintain_position(*args):
+            popup.pos_hint = {'center_x': 0.5, 'center_y': 0.5}
+            popup.pos = (
+                Window.width * 0.5 - popup.width * 0.5,
+                Window.height * 0.5 - popup.height * 0.5
+            )
+        
+        # Bind to maintain position on any window changes
+        Window.bind(on_keyboard=maintain_position)
+        
+        def save_changes(instance):
+            fields = [word_input.text.strip(), trans_input.text.strip(), 
+                    cat_input.text.strip(), dict_input.text.strip(), lang_input.text.strip()]
+            
+            if not all(fields):
+                status_label.text = '❌ Please fill all fields'
+                status_label.color = COLORS['error']
+                return
+            
+            try:
+                self.db_manager.update_word(word_id, *fields)
+                Window.unbind(on_keyboard=maintain_position)  # Clean up binding
+                popup.dismiss()
+                self.load_word_list()
+            except Exception as e:
+                status_label.text = f'❌ Error: {str(e)}'
+                status_label.color = COLORS['error']
+        
+        def cancel_edit(instance):
+            Window.unbind(on_keyboard=maintain_position)  # Clean up binding
+            popup.dismiss()
+        
+        save_btn.bind(on_press=save_changes)
+        cancel_btn.bind(on_press=cancel_edit)
+        
+        popup.open()
+        
+        # SOLUTION 3: Force position after popup opens
+        from kivy.clock import Clock
+        def force_center_position(dt):
+            popup.pos = (
+                Window.width * 0.5 - popup.width * 0.5,
+                Window.height * 0.5 - popup.height * 0.5
+            )
+        Clock.schedule_once(force_center_position, 0.1)
+
+
+
+
+
+    def show_delete_confirmation(self, word_data):
+        """Show confirmation popup for deleting a word"""
+        from kivy.uix.popup import Popup
+        from kivy.core.window import Window
+        
+        word_id, word, translation = word_data[0], word_data[1], word_data[2]
+        
+        # Create popup content with fixed height
+        popup_content = BoxLayout(orientation='vertical', spacing=dp(20), 
+                                padding=dp(25), size_hint_y=None, height=dp(200))
+        
+        # Warning message
+        warning_label = ModernLabel(
+            text=f'Are you sure you want to delete:\n\n"{word}" → "{translation}"\n\nThis action cannot be undone!',
+            label_type='body',
+            halign='center',
+            size_hint_y=None,
+            height=dp(120),
+            text_size=(None, None)
+        )
+        warning_label.color = COLORS['warning']
+        warning_label.bind(size=lambda instance, size: setattr(instance, 'text_size', (size[0], None)))
+        popup_content.add_widget(warning_label)
+        
+        # Buttons
+        button_layout = BoxLayout(orientation='horizontal', size_hint_y=None, 
+                                height=dp(50), spacing=dp(15))
+        
+        cancel_btn = ModernButton(text='Cancel', button_type='secondary', 
+                                size_hint_x=0.5)
+        delete_btn = ModernButton(text='🗑️ Delete', button_type='error', 
+                                size_hint_x=0.5)
+        
+        button_layout.add_widget(cancel_btn)
+        button_layout.add_widget(delete_btn)
+        popup_content.add_widget(button_layout)
+        
+        # Create popup with responsive sizing
+        popup = Popup(
+            title='',
+            content=popup_content, 
+            size_hint=(min(0.85, dp(350)/Window.width), min(0.5, dp(250)/Window.height)),
+            pos_hint={'center_x': 0.5, 'center_y': 0.5},
+            auto_dismiss=False,
+            separator_height=0
+        )
+        
+        def confirm_delete(instance):
+            try:
+                self.db_manager.delete_word(word_id)
+                popup.dismiss()
+                self.load_word_list()  # Refresh the list
+            except Exception as e:
+                print(f"Error deleting word: {e}")
+        
+        def cancel_delete(instance):
+            popup.dismiss()
+        
+        delete_btn.bind(on_press=confirm_delete)
+        cancel_btn.bind(on_press=cancel_delete)
+        
+        popup.open()
+
+
+
+
+
+
+
+class VocabularyApp(App):
+    def build(self):
+        # Initialize database manager
+        self.db_manager = DatabaseManager()
+        
+        # Create screen manager
+        sm = ScreenManager()
+        
+        # Add screens
+        sm.add_widget(MainMenuScreen(name='main'))
+        sm.add_widget(AddWordScreen(self.db_manager, name='add_word'))
+        sm.add_widget(FlashcardScreen(self.db_manager, name='flashcard'))
+        sm.add_widget(QuizScreen(self.db_manager, name='quiz'))
+        sm.add_widget(WordListScreen(self.db_manager, name='word_list'))
+        
+        return sm
+
+if __name__ == '__main__':
+    VocabularyApp().run()
