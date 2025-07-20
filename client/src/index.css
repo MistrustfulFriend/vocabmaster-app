@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(222, 84%, 4.9%);
+  --foreground: hsl(210, 40%, 98%);
+  --muted: hsl(217, 32%, 17%);
+  --muted-foreground: hsl(215, 20%, 65%);
+  --popover: hsl(222, 84%, 4.9%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --card: hsl(222, 84%, 4.9%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --border: hsl(217, 32%, 17%);
+  --input: hsl(217, 32%, 17%);
+  --primary: hsl(217, 91%, 60%);
+  --primary-foreground: hsl(222, 47%, 11%);
+  --secondary: hsl(222, 84%, 4.9%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --accent: hsl(217, 32%, 17%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(217, 91%, 60%);
+  --radius: 0.5rem;
+
+  /* Custom colors matching design */
+  --slate-900: hsl(222, 84%, 4.9%);
+  --slate-800: hsl(215, 28%, 17%);
+  --slate-700: hsl(215, 20%, 33%);
+  --slate-600: hsl(215, 16%, 47%);
+  --slate-400: hsl(215, 20%, 65%);
+  --slate-300: hsl(212, 23%, 82%);
+  --primary-blue: hsl(217, 91%, 60%);
+  --primary-dark: hsl(230, 81%, 56%);
+  --secondary-purple: hsl(261, 83%, 58%);
+  --accent-cyan: hsl(187, 95%, 43%);
+  --success-green: hsl(158, 64%, 52%);
+  --warning-amber: hsl(43, 96%, 56%);
+  --error-red: hsl(0, 84%, 60%);
+}
+
+.dark {
+  --background: hsl(222, 84%, 4.9%);
+  --foreground: hsl(210, 40%, 98%);
+  --muted: hsl(217, 32%, 17%);
+  --muted-foreground: hsl(215, 20%, 65%);
+  --popover: hsl(222, 84%, 4.9%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --card: hsl(222, 84%, 4.9%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --border: hsl(217, 32%, 17%);
+  --input: hsl(217, 32%, 17%);
+  --primary: hsl(217, 91%, 60%);
+  --primary-foreground: hsl(222, 47%, 11%);
+  --secondary: hsl(222, 84%, 4.9%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --accent: hsl(217, 32%, 17%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(217, 91%, 60%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased min-h-screen;
+    background: linear-gradient(135deg, hsl(var(--slate-900)), hsl(var(--slate-800)), hsl(var(--slate-900)));
+  }
+}
+
+@layer components {
+  .gradient-card {
+    background: linear-gradient(135deg, 
+      hsl(var(--primary-blue) / 0.1), 
+      hsl(var(--secondary-purple) / 0.1)
+    );
+    border: 1px solid hsl(var(--slate-700));
+  }
+
+  .gradient-button {
+    background: linear-gradient(135deg, 
+      hsl(var(--primary-blue)), 
+      hsl(var(--primary-dark))
+    );
+  }
+
+  .gradient-button:hover {
+    background: linear-gradient(135deg, 
+      hsl(var(--primary-dark)), 
+      hsl(var(--primary-blue))
+    );
+  }
+
+  .glass {
+    background: hsl(var(--slate-800) / 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid hsl(var(--slate-700));
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--slate-800));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--slate-600));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--slate-500));
+}
+
+/* 3D Flashcard styles */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
